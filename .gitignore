@@ -1,0 +1,16 @@
+# Ambiente
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Relatórios baixados
+*.xlsx
+elawReport_*
+
+# Logs
+*.log
+logs/
+
+# Banco de dados de histórico
+runs.db

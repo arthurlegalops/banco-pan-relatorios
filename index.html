@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orquestra · Relatórios Banco Pan</title>
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --surface: #111318;
+    --surface-2: #16181e;
+    --surface-hover: #1b1e25;
+    --border: #22252c;
+    --border-soft: #1a1c22;
+    --text: #e8e9ec;
+    --text-dim: #83868f;
+    --text-faint: #55585f;
+    --accent: #5b8cff;
+    --accent-soft: rgba(91, 140, 255, 0.12);
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.12);
+    --warning: #f5b962;
+    --warning-soft: rgba(245, 185, 98, 0.12);
+    --error: #f2685c;
+    --error-soft: rgba(242, 104, 92, 0.12);
+    --idle: #33363d;
+    --radius: 10px;
+    --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", Roboto, sans-serif;
+    --mono: "Cascadia Code", "Consolas", "SFMono-Regular", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent-soft); }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 14px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 22px;
+  }
+
+  .brand-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: #0a0b0d;
+    flex-shrink: 0;
+  }
+
+  .brand-text h1 {
+    font-size: 13.5px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    line-height: 1.3;
+  }
+
+  .brand-text span {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  nav.nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .nav-item:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .nav-item.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-icon svg { width: 16px; height: 16px; }
+
+  .sidebar-spacer { flex: 1; }
+
+  .sidebar-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--idle);
+    flex-shrink: 0;
+  }
+
+  .dot.running { background: var(--accent); animation: pulse 1.4s infinite; }
+  .dot.success { background: var(--success); }
+  .dot.error { background: var(--error); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  button.primary {
+    background: var(--accent);
+    border: none;
+    color: #0a0b0d;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s ease;
+  }
+
+  button.primary:hover { opacity: 0.9; }
+
+  button.primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .sidebar-footer {
+    font-size: 10.5px;
+    color: var(--text-faint);
+    padding: 4px 10px;
+    margin-top: 12px;
+  }
+
+  /* ---------- Content ---------- */
+  .content {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .page {
+    display: none;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 36px 40px 60px;
+  }
+
+  .page.active { display: block; }
+
+  .page-header {
+    margin-bottom: 24px;
+  }
+
+  .page-header h2 {
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.2px;
+  }
+
+  .page-header p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  section.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title .actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  button.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 11px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+
+  button.ghost:hover {
+    border-color: var(--text-faint);
+    color: var(--text);
+    background: var(--surface-hover);
+  }
+
+  button.small {
+    padding: 4px 9px;
+    font-size: 11px;
+  }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .step {
+    display: flex;
+    gap: 14px;
+    position: relative;
+  }
+
+  .step-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 26px;
+    flex-shrink: 0;
+  }
+
+  .step-node {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1.5px solid var(--idle);
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: all 0.2s ease;
+    z-index: 1;
+  }
+
+  .step-line {
+    width: 1.5px;
+    flex: 1;
+    background: var(--border);
+    margin: 2px 0;
+    min-height: 18px;
+  }
+
+  .step:last-child .step-line { display: none; }
+
+  .step-body {
+    padding: 1px 0 20px 0;
+    flex: 1;
+  }
+
+  .step-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.45;
+  }
+
+  .step-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  /* States */
+  .step.state-done .step-node {
+    border-color: var(--success);
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  .step.state-done .step-line { background: var(--success); opacity: 0.35; }
+
+  .step.state-running .step-node {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    animation: ring 1.6s infinite;
+  }
+  .step.state-running .step-name { color: var(--accent); }
+
+  @keyframes ring {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+    50% { box-shadow: 0 0 0 4px var(--accent-soft); }
+  }
+
+  .step.state-error .step-node {
+    border-color: var(--error);
+    background: var(--error-soft);
+    color: var(--error);
+  }
+  .step.state-error .step-name { color: var(--error); }
+  .step.state-error .step-meta { color: var(--error); }
+
+  .step.state-pending .step-node { opacity: 0.55; }
+  .step.state-pending .step-name { color: var(--text-dim); }
+
+  /* Sub-steps (report cards) */
+  .sub-steps {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .report-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+
+  .report-chip .chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--idle);
+  }
+
+  .report-chip.ready .chip-dot { background: var(--success); }
+  .report-chip.waiting .chip-dot { background: var(--warning); animation: pulse 1.4s infinite; }
+  .report-chip.ready { color: var(--text); border-color: rgba(52,211,153,0.25); }
+
+  /* Logs */
+  .log-console {
+    flex: 1;
+    background: #08090b;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 15px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    min-height: 0;
+  }
+
+  .log-line {
+    display: flex;
+    gap: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .log-time { color: var(--text-faint); flex-shrink: 0; }
+  .log-level { flex-shrink: 0; font-weight: 700; width: 58px; }
+  .log-level.INFO { color: var(--accent); }
+  .log-level.WARNING { color: var(--warning); }
+  .log-level.ERROR { color: var(--error); }
+  .log-msg { color: var(--text); }
+
+  .log-console::-webkit-scrollbar, .pipeline::-webkit-scrollbar,
+  .history-table-wrap::-webkit-scrollbar, .content::-webkit-scrollbar { width: 8px; height: 8px; }
+  .log-console::-webkit-scrollbar-thumb, .pipeline::-webkit-scrollbar-thumb,
+  .history-table-wrap::-webkit-scrollbar-thumb, .content::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 8px;
+  }
+
+  .log-empty { color: var(--text-faint); font-size: 12px; }
+
+  .viewing-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--accent-soft);
+    border: 1px solid rgba(91, 140, 255, 0.25);
+    color: var(--text);
+    font-size: 11.5px;
+    padding: 7px 11px;
+    border-radius: 7px;
+    margin-bottom: 10px;
+  }
+  .viewing-banner.visible { display: flex; }
+
+  .summary-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .summary-card {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 10px;
+    text-align: center;
+  }
+
+  .summary-card .num {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .summary-card .lbl {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-top: 2px;
+  }
+
+  /* History */
+  .history-table-wrap {
+    overflow-x: auto;
+  }
+
+  table.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  table.history-table th {
+    text-align: left;
+    color: var(--text-dim);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.history-table td {
+    padding: 11px 10px;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text);
+  }
+
+  table.history-table tr:last-child td { border-bottom: none; }
+  table.history-table tbody tr:hover { background: var(--surface-2); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .badge.success { background: var(--success-soft); color: var(--success); }
+  .badge.error { background: var(--error-soft); color: var(--error); }
+  .badge.running { background: var(--accent-soft); color: var(--accent); }
+
+  /* Schedule */
+  .schedule-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 28px;
+  }
+
+  .schedule-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .switch input { opacity: 0; width: 0; height: 0; }
+
+  .switch-track {
+    position: absolute;
+    inset: 0;
+    background: var(--idle);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .switch-track::before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: #e8e9ec;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+  }
+
+  .switch input:checked + .switch-track { background: var(--accent); }
+  .switch input:checked + .switch-track::before { transform: translateX(16px); background: #0a0b0d; }
+
+  .schedule-field label {
+    display: block;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+
+  input[type="time"] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  .day-chips {
+    display: flex;
+    gap: 5px;
+  }
+
+  .day-chip {
+    width: 36px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s ease;
+  }
+
+  .day-chip:hover { border-color: var(--text-faint); }
+
+  .day-chip.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .schedule-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .schedule-actions button.primary {
+    width: auto;
+    padding: 9px 16px;
+  }
+
+  .schedule-next {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .schedule-next strong { color: var(--text); }
+
+  @media (max-width: 980px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 760px) {
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-icon">⚙</div>
+    <div class="brand-text">
+      <h1>Relatórios · Pan</h1>
+      <span>Automação eLaw</span>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-item active" data-page="overview" onclick="switchPage('overview')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      </span>
+      Visão geral
+    </button>
+    <button class="nav-item" data-page="history" onclick="switchPage('history')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      </span>
+      Histórico
+    </button>
+    <button class="nav-item" data-page="schedule" onclick="switchPage('schedule')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      </span>
+      Agendamento
+    </button>
+  </nav>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-status">
+    <span class="dot" id="global-dot"></span>
+    <span id="global-status">Conectando...</span>
+  </div>
+  <button class="primary" id="run-btn" onclick="runNow()">Executar agora</button>
+  <div class="sidebar-footer">Orquestra · Banco Pan</div>
+</aside>
+
+<div class="content">
+
+  <section class="page active" id="page-overview">
+    <div class="page-header">
+      <h2>Visão geral</h2>
+      <p>Acompanhe o pipeline e os logs da execução em tempo real.</p>
+    </div>
+
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-title">Pipeline</div>
+        <div class="pipeline" id="pipeline"></div>
+        <div class="summary-bar">
+          <div class="summary-card"><div class="num" id="sum-done" style="color:var(--success)">0</div><div class="lbl">concluídas</div></div>
+          <div class="summary-card"><div class="num" id="sum-running" style="color:var(--accent)">0</div><div class="lbl">em andamento</div></div>
+          <div class="summary-card"><div class="num" id="sum-pending" style="color:var(--text-dim)">0</div><div class="lbl">pendentes</div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          Logs
+          <div class="actions">
+            <button class="ghost" onclick="clearLogs()">Limpar</button>
+          </div>
+        </div>
+        <div class="viewing-banner" id="viewing-banner">
+          <span id="viewing-banner-text"></span>
+          <button class="ghost small" onclick="voltarAoVivo()">Voltar ao vivo</button>
+        </div>
+        <div class="log-console" id="log-console">
+          <div class="log-empty">Nenhuma execução ainda. Clique em "Executar agora" para iniciar.</div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="page" id="page-history">
+    <div class="page-header">
+      <h2>Histórico de execução</h2>
+      <p>Todas as execuções manuais e agendadas registradas.</p>
+    </div>
+
+    <section class="panel">
+      <div class="panel-title">
+        Execuções
+        <div class="actions">
+          <button class="ghost" onclick="loadHistory()">Atualizar</button>
+        </div>
+      </div>
+      <div class="history-table-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Status</th>
+              <th>Relatórios</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td colspan="6" class="log-empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <section class="page" id="page-schedule">
+    <div class="page-header">
+      <h2>Agendamento</h2>
+      <p>Defina quando o pipeline deve rodar automaticamente.</p>
+    </div>
+
+    <section class="panel">
+      <div class="panel-title">Configuração</div>
+      <div class="schedule-row">
+        <div class="schedule-toggle">
+          <label class="switch">
+            <input type="checkbox" id="sched-enabled" onchange="onScheduleChange()">
+            <span class="switch-track"></span>
+          </label>
+          <span id="sched-enabled-label">Desativado</span>
+        </div>
+
+        <div class="schedule-field">
+          <label>Horário</label>
+          <input type="time" id="sched-time" onchange="onScheduleChange()">
+        </div>
+
+        <div class="schedule-field">
+          <label>Dias da semana</label>
+          <div class="day-chips" id="sched-days"></div>
+        </div>
+
+        <div class="schedule-actions">
+          <button class="primary" id="sched-save-btn" onclick="saveSchedule()">Salvar</button>
+          <div class="schedule-next" id="sched-next"></div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+</div>
+
+<script>
+  function switchPage(pageId) {
+    document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === `page-${pageId}`));
+    document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.page === pageId));
+  }
+
+  const STEP_DEFS = [
+    { id: "login", name: "Login", desc: "Abertura do navegador e autenticação no eLaw." },
+    { id: "filtros", name: "Seleção de filtros", desc: "Aplicação dos filtros de status na pesquisa de processos." },
+    { id: "pesquisa", name: "Executar pesquisa", desc: "Disparo da busca e espera pelo carregamento da lista de processos." },
+    { id: "exportacao", name: "Exportação dos relatórios", desc: "Solicitação de exportação para Excel de cada relatório." },
+    { id: "aguardar", name: "Aguardar processamento", desc: "Polling na lista de relatórios até todos ficarem prontos para download." },
+    { id: "download", name: "Download dos arquivos", desc: "Download de cada relatório pronto para a pasta do projeto." },
+  ];
+
+  let state = {
+    running: false,
+    run_id: null,
+    steps: {},
+    reports: {},
+  };
+  let viewingHistoryId = null;
+  let ws = null;
+
+  function stepIcon(status) {
+    if (status === "done") return "✓";
+    if (status === "error") return "✕";
+    if (status === "running") return "↻";
+    return "";
+  }
+
+  function renderPipeline() {
+    const el = document.getElementById("pipeline");
+    el.innerHTML = "";
+    let done = 0, running = 0, pending = 0;
+
+    STEP_DEFS.forEach((def, idx) => {
+      const s = state.steps[def.id] || { status: "pending", meta: null };
+      if (s.status === "done") done++;
+      else if (s.status === "running") running++;
+      else pending++;
+
+      const stepDiv = document.createElement("div");
+      stepDiv.className = `step state-${s.status}`;
+
+      let subStepsHtml = "";
+      if (def.id === "exportacao") {
+        const chips = Object.entries(state.reports).map(([name, status]) => {
+          const cls = status === "ready" || status === "downloaded" ? "ready" : "waiting";
+          return `<div class="report-chip ${cls}"><span class="chip-dot"></span>${name}</div>`;
+        }).join("");
+        if (chips) subStepsHtml = `<div class="sub-steps">${chips}</div>`;
+      }
+
+      const metaHtml = s.meta ? `<div class="step-meta">${escapeHtml(s.meta)}</div>` : "";
+
+      stepDiv.innerHTML = `
+        <div class="step-marker">
+          <div class="step-node">${stepIcon(s.status) || (idx + 1)}</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-body">
+          <div class="step-name">${def.name}</div>
+          <div class="step-desc">${def.desc}</div>
+          ${subStepsHtml}
+          ${metaHtml}
+        </div>`;
+      el.appendChild(stepDiv);
+    });
+
+    document.getElementById("sum-done").textContent = done;
+    document.getElementById("sum-running").textContent = running;
+    document.getElementById("sum-pending").textContent = pending;
+  }
+
+  function renderStatusPill() {
+    const dot = document.getElementById("global-dot");
+    const label = document.getElementById("global-status");
+    dot.className = "dot";
+    if (state.running) {
+      dot.classList.add("running");
+      label.textContent = `Executando (run #${state.run_id})`;
+    } else {
+      const hasError = Object.values(state.steps).some(s => s.status === "error");
+      if (hasError) {
+        dot.classList.add("error");
+        label.textContent = "Última execução falhou";
+      } else if (Object.values(state.steps).some(s => s.status === "done")) {
+        dot.classList.add("success");
+        label.textContent = "Última execução concluída";
+      } else {
+        label.textContent = "Ocioso";
+      }
+    }
+    document.getElementById("run-btn").disabled = state.running;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function appendLogLine({ time, level, message }) {
+    const console_ = document.getElementById("log-console");
+    const empty = console_.querySelector(".log-empty");
+    if (empty) empty.remove();
+    const line = document.createElement("div");
+    line.className = "log-line";
+    line.innerHTML = `<span class="log-time">${time}</span><span class="log-level ${level}">${level}</span><span class="log-msg">${escapeHtml(message)}</span>`;
+    console_.appendChild(line);
+    console_.scrollTop = console_.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById("log-console").innerHTML = '<div class="log-empty">Sem entradas.</div>';
+  }
+
+  function connectWS() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === "status" || msg.type === "run_finished") {
+        state.running = msg.running;
+        state.run_id = msg.run_id;
+        state.steps = msg.steps;
+        state.reports = msg.reports;
+        renderPipeline();
+        renderStatusPill();
+        if (msg.type === "run_finished") loadHistory();
+      } else if (msg.type === "step") {
+        state.steps[msg.step] = { status: msg.status, meta: msg.meta };
+        renderPipeline();
+        renderStatusPill();
+      } else if (msg.type === "report") {
+        state.reports[msg.name] = msg.status;
+        renderPipeline();
+      } else if (msg.type === "log") {
+        if (viewingHistoryId === null) appendLogLine(msg);
+      }
+    };
+
+    ws.onclose = () => {
+      document.getElementById("global-status").textContent = "Desconectado — tentando reconectar...";
+      setTimeout(connectWS, 2000);
+    };
+  }
+
+  async function runNow() {
+    if (viewingHistoryId !== null) voltarAoVivo();
+    const btn = document.getElementById("run-btn");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/run", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || "Não foi possível iniciar a execução.");
+        btn.disabled = state.running;
+      } else {
+        clearLogs();
+      }
+    } catch (e) {
+      alert("Erro ao contatar o servidor.");
+      btn.disabled = state.running;
+    }
+  }
+
+  function statusBadge(status) {
+    if (status === "success") return '<span class="badge success">concluído</span>';
+    if (status === "error") return '<span class="badge error">erro</span>';
+    return '<span class="badge running">em execução</span>';
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    return iso.replace("T", " ");
+  }
+
+  async function loadHistory() {
+    const res = await fetch("/api/history");
+    const rows = await res.json();
+    const body = document.getElementById("history-body");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6" class="log-empty">Nenhuma execução registrada ainda.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td>#${r.id}</td>
+        <td>${fmtDate(r.started_at)}</td>
+        <td>${fmtDate(r.finished_at)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td>${r.downloads}${r.error ? ` <span style="color:var(--error)">— ${escapeHtml(r.error)}</span>` : ""}</td>
+        <td><button class="ghost small" onclick="verLogs(${r.id})">Ver logs</button></td>
+      </tr>
+    `).join("");
+  }
+
+  async function verLogs(runId) {
+    const res = await fetch(`/api/history/${runId}/logs`);
+    const body = await res.json();
+    viewingHistoryId = runId;
+    switchPage("overview");
+    const banner = document.getElementById("viewing-banner");
+    banner.classList.add("visible");
+    document.getElementById("viewing-banner-text").textContent = `Exibindo logs da execução #${runId}`;
+    const console_ = document.getElementById("log-console");
+    if (body.error) {
+      console_.innerHTML = `<div class="log-empty">${escapeHtml(body.error)}</div>`;
+      return;
+    }
+    const lines = body.log.split("\n").filter(Boolean);
+    console_.innerHTML = lines.map(line => {
+      const m = line.match(/^(\S+) \[(\w+)\] (.*)$/);
+      if (!m) return `<div class="log-line"><span class="log-msg">${escapeHtml(line)}</span></div>`;
+      const [, time, level, message] = m;
+      return `<div class="log-line"><span class="log-time">${time}</span><span class="log-level ${level}">${level}</span><span class="log-msg">${escapeHtml(message)}</span></div>`;
+    }).join("");
+  }
+
+  function voltarAoVivo() {
+    viewingHistoryId = null;
+    document.getElementById("viewing-banner").classList.remove("visible");
+    clearLogs();
+  }
+
+  const DAY_LABELS = [
+    { id: "mon", label: "Seg" },
+    { id: "tue", label: "Ter" },
+    { id: "wed", label: "Qua" },
+    { id: "thu", label: "Qui" },
+    { id: "fri", label: "Sex" },
+    { id: "sat", label: "Sáb" },
+    { id: "sun", label: "Dom" },
+  ];
+  let scheduleDirty = false;
+  let selectedDays = new Set();
+
+  function renderDayChips() {
+    const el = document.getElementById("sched-days");
+    el.innerHTML = DAY_LABELS.map(d =>
+      `<button type="button" class="day-chip${selectedDays.has(d.id) ? " active" : ""}" data-day="${d.id}" onclick="toggleDay('${d.id}')">${d.label}</button>`
+    ).join("");
+  }
+
+  function toggleDay(dayId) {
+    if (selectedDays.has(dayId)) selectedDays.delete(dayId);
+    else selectedDays.add(dayId);
+    renderDayChips();
+    onScheduleChange();
+  }
+
+  function onScheduleChange() {
+    scheduleDirty = true;
+    const enabled = document.getElementById("sched-enabled").checked;
+    document.getElementById("sched-enabled-label").textContent = enabled ? "Ativado" : "Desativado";
+  }
+
+  function fmtNextRun(iso) {
+    if (!iso) return "Sem próxima execução agendada.";
+    const d = new Date(iso);
+    return `Próxima execução: <strong>${d.toLocaleString("pt-BR")}</strong>`;
+  }
+
+  async function loadSchedule() {
+    if (scheduleDirty) return;
+    const res = await fetch("/api/schedule");
+    const cfg = await res.json();
+    document.getElementById("sched-enabled").checked = cfg.enabled;
+    document.getElementById("sched-enabled-label").textContent = cfg.enabled ? "Ativado" : "Desativado";
+    document.getElementById("sched-time").value =
+      `${String(cfg.hour).padStart(2, "0")}:${String(cfg.minute).padStart(2, "0")}`;
+    selectedDays = new Set(cfg.days);
+    renderDayChips();
+    document.getElementById("sched-next").innerHTML = fmtNextRun(cfg.next_run_time);
+  }
+
+  async function saveSchedule() {
+    const enabled = document.getElementById("sched-enabled").checked;
+    const timeVal = document.getElementById("sched-time").value || "08:00";
+    const [hour, minute] = timeVal.split(":").map(Number);
+    const btn = document.getElementById("sched-save-btn");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled, hour, minute, days: Array.from(selectedDays) }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        alert(body.error || "Não foi possível salvar o agendamento.");
+        return;
+      }
+      scheduleDirty = false;
+      document.getElementById("sched-next").innerHTML = fmtNextRun(body.next_run_time);
+    } catch (e) {
+      alert("Erro ao contatar o servidor.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function init() {
+    const res = await fetch("/api/status");
+    const snap = await res.json();
+    state.running = snap.running;
+    state.run_id = snap.run_id;
+    state.steps = snap.steps;
+    state.reports = snap.reports;
+    renderPipeline();
+    renderStatusPill();
+    connectWS();
+    loadHistory();
+    loadSchedule();
+  }
+
+  init();
+</script>
+
+</body>
+</html>
