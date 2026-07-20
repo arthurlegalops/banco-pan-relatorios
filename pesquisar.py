@@ -27,6 +27,7 @@ def pesquisar(
     recover: Callable[[], Page],
     download_dir: Path,
     existentes: dict[str, Path],
+    ids_informados: dict[str, str] | None = None,
     on_step: OnStep = None,
     on_report: OnReport = None,
 ) -> list[Path]:
@@ -38,6 +39,10 @@ def pesquisar(
     (nome -> caminho), verificados antes de abrir o navegador; apenas os
     relatórios ausentes desse dict são exportados/baixados aqui.
 
+    `ids_informados` traz relatórios que já estão em processamento no elaw
+    de uma execução anterior interrompida (nome -> ID); esses não são
+    reexportados, apenas aguardados/baixados diretamente.
+
     `recover` fecha o navegador atual, abre um novo, refaz o login e
     retorna a nova página — usado caso a sessão caia durante a espera
     do processamento dos relatórios.
@@ -45,11 +50,15 @@ def pesquisar(
     `on_step` e `on_report`, se informados, são chamados para reportar o
     progresso do pipeline e o status de cada relatório à interface."""
     todos_nomes = REPORT_NAMES + [PAUTA_GERAL_NOME]
+    ids_informados = ids_informados or {}
 
-    pendentes_geral = [nome for nome in REPORT_NAMES if nome not in existentes]
-    pauta_pendente = PAUTA_GERAL_NOME not in existentes
+    pendentes_geral = [nome for nome in REPORT_NAMES if nome not in existentes and nome not in ids_informados]
+    pauta_pendente = PAUTA_GERAL_NOME not in existentes and PAUTA_GERAL_NOME not in ids_informados
 
-    relatorio_ids: dict[str, str] = {}
+    relatorio_ids: dict[str, str] = dict(ids_informados)
+    for nome in ids_informados:
+        logger.info(f"Relatório '{nome}' informado como já em processamento (ID {ids_informados[nome]}), pulando exportação.")
+        emit_report(on_report, nome, "waiting")
 
     if pendentes_geral:
         logger.info("Navegando para a página de pesquisa...")

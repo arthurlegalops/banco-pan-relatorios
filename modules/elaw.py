@@ -2,7 +2,9 @@
 filtros, execução da busca e exportação para Excel."""
 
 import logging
+import shutil
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -11,7 +13,15 @@ logger = logging.getLogger(__name__)
 
 SEARCH_URL = "https://bancopan.elaw.com.br/processoList.elaw"
 PAUTA_GERAL_URL = "https://bancopan.elaw.com.br/agendamentoContenciosoList.elaw"
-BASE_REPORTS_DIR = Path.home() / "Mascarenhas Barbosa Advogados" / "MBA - Robô de Checagem"
+
+# Pasta local (não depende de OneDrive/rede) — os relatórios ficam aqui
+# temporariamente até o usuário baixá-los pelo painel web.
+BASE_REPORTS_DIR = Path(__file__).resolve().parent.parent / "temp"
+RETENCAO_DIAS = 7
+
+# A pesquisa da pauta geral cobre todos os processos do ano inteiro e pode
+# demorar bem mais que o padrão do Playwright (30s) para terminar.
+PAUTA_GERAL_SEARCH_TIMEOUT = 600_000
 
 
 def criar_pasta_dia(base: Path = BASE_REPORTS_DIR) -> Path:
@@ -21,6 +31,26 @@ def criar_pasta_dia(base: Path = BASE_REPORTS_DIR) -> Path:
     pasta = base / data
     pasta.mkdir(parents=True, exist_ok=True)
     return pasta
+
+
+def limpar_relatorios_antigos(base: Path = BASE_REPORTS_DIR, dias: int = RETENCAO_DIAS) -> None:
+    """Remove subpastas `AAAA-MM-DD` de `base` com mais de `dias` dias —
+    os relatórios ficam disponíveis para download pelo painel só por esse
+    período. Pastas com nome fora do padrão de data são ignoradas."""
+    if not base.exists():
+        return
+
+    limite = datetime.now() - timedelta(days=dias)
+    for pasta in base.iterdir():
+        if not pasta.is_dir():
+            continue
+        try:
+            data_pasta = datetime.strptime(pasta.name, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if data_pasta < limite:
+            logger.info(f"Removendo relatórios expirados em: {pasta}")
+            shutil.rmtree(pasta, ignore_errors=True)
 
 
 REPORT_NAMES = ["DADOS DO PROCESSO", "ESCRITÓRIO - TAREFAS"]
@@ -52,6 +82,19 @@ def relatorios_existentes(pasta: Path) -> dict[str, Path]:
         if caminho:
             existentes[nome] = caminho
     return existentes
+
+
+def perguntar_ids_em_processamento(nomes: list[str]) -> dict[str, str]:
+    """Para cada nome em `nomes`, pergunta ao usuário o ID de um relatório
+    que já esteja em processamento no elaw (ex.: fluxo anterior interrompido
+    antes do download). Retorna {nome: id} apenas para as respostas não
+    vazias — os demais seguem o fluxo normal de exportação."""
+    ids: dict[str, str] = {}
+    for nome in nomes:
+        resposta = input(f"ID do relatório '{nome}' já em processamento (Enter se não houver): ").strip()
+        if resposta:
+            ids[nome] = resposta
+    return ids
 
 CHECKBOX_XPATHS = [
     '//*[@id="tabSearchTab:comboStatus_panel"]/div[2]/ul/li[2]/div',
@@ -131,8 +174,10 @@ def exportar_pauta_geral(page: Page) -> str:
     page.locator('//*[@id="tabSearchTab:status:1"]').click()
     page.locator('//*[@id="tabSearchTab:status:2"]').click()
 
+    logger.info("Pesquisando pauta geral (pode demorar, cobre o ano inteiro)...")
     page.locator('//*[@id="tabSearchTab:btnPesquisar"]').click(timeout=120000)
-    page.locator('//*[@id="btnExcelProcesso"]').click(timeout=120000)
+    page.wait_for_load_state("networkidle", timeout=PAUTA_GERAL_SEARCH_TIMEOUT)
+    page.locator('//*[@id="btnExcelProcesso"]').click(timeout=PAUTA_GERAL_SEARCH_TIMEOUT)
 
     page.frame_locator("iframe").locator('xpath=//*[@id="selectProcessoReport_label"]').click()
     page.keyboard.type(PAUTA_GERAL_NOME, delay=100)
