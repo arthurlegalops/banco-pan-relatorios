@@ -1,17 +1,13 @@
 import logging
-from pathlib import Path
+import threading
+from typing import Callable, Optional
 
 from playwright.sync_api import sync_playwright
 
+import modules.storage as storage
 from modules.browser import SessaoElaw
-from modules.elaw import (
-    PAUTA_GERAL_NOME,
-    REPORT_NAMES,
-    criar_pasta_dia,
-    limpar_relatorios_antigos,
-    perguntar_ids_em_processamento,
-    relatorios_existentes,
-)
+from modules.cancel import checar_cancelamento
+from modules.elaw import PAUTA_GERAL_NOME, REPORT_NAMES
 from modules.login import LoginConfig
 from modules.progress import OnReport, OnStep, emit_report
 from pesquisar import pesquisar
@@ -23,57 +19,62 @@ logger = logging.getLogger(__name__)
 
 
 def executar(
-    ids_informados: dict[str, str] | None = None,
     on_step: OnStep = None,
     on_report: OnReport = None,
-) -> list[Path]:
-    """Executa o pipeline completo (login, pesquisa, exportação e download
-    dos relatórios) e retorna os caminhos dos arquivos baixados.
-
-    `ids_informados` traz relatórios já em processamento no elaw de uma
-    execução anterior interrompida (nome -> ID) — usado apenas pelo fluxo
-    de linha de comando (`main()`); a execução via web nunca informa isso.
+    cancel_event: Optional[threading.Event] = None,
+    on_sessao: Optional[Callable[[SessaoElaw], None]] = None,
+) -> dict[str, str]:
+    """Executa o pipeline completo (login, pesquisa, exportação e upload
+    dos relatórios pro S3) e retorna {nome_relatorio: chave_s3}.
+    Relatórios já registrados hoje no elaw (ex.: execução anterior
+    interrompida) são detectados automaticamente e reaproveitados, sem
+    reexportar. Relatórios já enviados hoje pro S3 também são reaproveitados,
+    sem reexportar nem reenviar.
 
     `on_step`/`on_report`, se informados, recebem atualizações de progresso
-    — usados pela interface web para acompanhar a execução em tempo real."""
-    limpar_relatorios_antigos()
-    download_dir = criar_pasta_dia()
+    — usados pela interface para acompanhar a execução em tempo real.
+
+    `cancel_event`, se informado, é checado entre as etapas do pipeline;
+    quando marcado, a execução é interrompida com `ExecucaoCancelada`.
+    `on_sessao`, se informado, recebe a `SessaoElaw` assim que o login é
+    concluído — permite que quem chamou force o cancelamento (fechando o
+    navegador) mesmo durante uma espera longa em andamento."""
+    checar_cancelamento(cancel_event)
+    pasta = storage.pasta_do_dia()
     todos_nomes = REPORT_NAMES + [PAUTA_GERAL_NOME]
-    existentes = relatorios_existentes(download_dir)
+    existentes = storage.relatorios_existentes(pasta)
 
     if len(existentes) == len(todos_nomes):
-        logger.info(f"Todos os relatórios do dia já existem em {download_dir}, navegador não será aberto.")
+        logger.info(
+            f"Todos os relatórios do dia já existem no S3 (pasta {pasta}), navegador não será aberto.")
         for nome in todos_nomes:
-            emit_report(on_report, nome, "downloaded")
-        return [existentes[nome] for nome in todos_nomes]
+            emit_report(on_report, nome, "downloaded", existentes[nome])
+        return existentes
 
-    for nome, caminho in existentes.items():
-        logger.info(f"Relatório '{nome}' já existe em {caminho}, pulando geração.")
-        emit_report(on_report, nome, "downloaded")
+    for nome, chave in existentes.items():
+        logger.info(
+            f"Relatório '{nome}' já existe no S3 ({chave}), pulando geração.")
+        emit_report(on_report, nome, "downloaded", chave)
 
     config = LoginConfig.from_env()
 
     with sync_playwright() as p:
         sessao = SessaoElaw(p, config, on_step)
+        if on_sessao:
+            on_sessao(sessao)
         try:
             return pesquisar(
-                sessao.page, sessao.recover, download_dir, existentes,
-                ids_informados=ids_informados, on_step=on_step, on_report=on_report,
+                sessao.page, sessao.recover, pasta, existentes,
+                on_step=on_step, on_report=on_report, cancel_event=cancel_event,
             )
         finally:
             sessao.close()
 
 
 def main() -> None:
-    download_dir = criar_pasta_dia()
-    existentes = relatorios_existentes(download_dir)
-    nomes_pendentes = [nome for nome in REPORT_NAMES + [PAUTA_GERAL_NOME] if nome not in existentes]
-    ids_informados = perguntar_ids_em_processamento(nomes_pendentes) if nomes_pendentes else {}
-
-    downloads = executar(ids_informados=ids_informados)
-    print(f"Relatórios baixados: {downloads}")
-    print("Pressione Enter para fechar...")
-    input()
+    downloads = executar()
+    logger.info(f"Relatórios baixados: {downloads}")
+    input("Pressione Enter para fechar...")
 
 
 if __name__ == "__main__":

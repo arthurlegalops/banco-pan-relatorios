@@ -7,14 +7,20 @@ __pycache__/
 # Relatórios baixados
 *.xlsx
 elawReport_*
-/temp/
+temp_downloads/
 
 # Logs
 *.log
 logs/
 
-# Banco de dados de histórico
+# Banco de dados de histórico (legado, pré-migração para MongoDB)
 runs.db
 
-# Configuração de agendamento
-schedule.json
+# Build/instalador (gerados por build.ps1)
+pw-browsers/
+build/
+dist/
+installer/
+
+# Config local do Claude Code
+.claude/

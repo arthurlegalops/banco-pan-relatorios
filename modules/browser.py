@@ -1,11 +1,26 @@
 """Ciclo de vida do navegador: abrir, logar e recuperar a sessão do elaw."""
 
 import logging
+import os
+import sys
 
-from playwright.sync_api import Browser, Page, Playwright
+from modules.paths import APP_DIR
 
-from modules.login import LoginConfig, login
-from modules.progress import OnStep
+# Só redireciona quando empacotado (ver build.ps1/packaging/relatorios.spec):
+# em dev, continua usando o cache padrão do Playwright
+# (%LOCALAPPDATA%\ms-playwright), que já está populado nesta máquina — nada
+# muda para quem roda `python server.py` direto do código-fonte. No .exe
+# empacotado, aponta para {app}\pw-browsers (copiado por build.ps1) em vez
+# do cache do usuário, que não existe numa instalação limpa. Precisa ser
+# setado antes de qualquer uso do Playwright (ver `sync_playwright()` em
+# main.py).
+if getattr(sys, "frozen", False):
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(APP_DIR / "pw-browsers"))
+
+from playwright.sync_api import Browser, Page, Playwright  # noqa: E402
+
+from modules.login import LoginConfig, login  # noqa: E402
+from modules.progress import OnStep  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -36,3 +51,12 @@ class SessaoElaw:
 
     def close(self) -> None:
         self.browser.close()
+
+    def cancelar(self) -> None:
+        """Força o fechamento do navegador a partir de outra thread (ex.:
+        requisição HTTP de cancelamento) para interromper imediatamente
+        qualquer chamada do Playwright em andamento na thread do pipeline."""
+        try:
+            self.browser.close()
+        except Exception:
+            pass

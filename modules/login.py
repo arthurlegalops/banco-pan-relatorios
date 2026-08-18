@@ -1,16 +1,17 @@
 """Login no elaw (Banco Pan)."""
 
 import logging
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, set_key
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+from modules.paths import APP_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,14 @@ BASE_URL = "https://bancopan.elaw.com.br"
 SCREENSHOTS_DIR = Path("logs") / "screenshots"
 MAX_ATTEMPTS = 5
 RETRY_DELAY = 2.0
+
+# As credenciais ficam num .env ao lado do .exe (ou da raiz do projeto em
+# dev - ver modules/paths.py), editável pelo painel web em "Credenciais"
+# sem precisar reconstruir/reinstalar o app. Lido via `dotenv_values` (não
+# `load_dotenv` + `os.getenv`) para nunca depender de estado em cache: cada
+# chamada reflete o arquivo como ele está agora, mesmo logo após uma edição
+# salva na mesma execução do servidor.
+ENV_FILE = APP_DIR / ".env"
 
 
 class LoginError(Exception):
@@ -36,12 +45,30 @@ class LoginConfig:
 
     @classmethod
     def from_env(cls) -> "LoginConfig":
-        load_dotenv()
-        email = os.getenv("EMAIL")
-        password = os.getenv("PASS")
+        valores = dotenv_values(ENV_FILE)
+        email = valores.get("EMAIL")
+        password = valores.get("PASS")
         if not email or not password:
-            raise LoginError("Variáveis de ambiente EMAIL/PASS ausentes.")
+            raise LoginError(
+                "Credenciais do eLaw não configuradas. Configure em \"Credenciais\" no painel.")
         return cls(email=email, password=password)
+
+
+def credenciais_atuais() -> tuple[str, bool]:
+    """Retorna (email, tem_senha) lidos do .env atual, sem nunca expor a
+    senha em si — usado para preencher o formulário de configuração."""
+    valores = dotenv_values(ENV_FILE)
+    return valores.get("EMAIL") or "", bool(valores.get("PASS"))
+
+
+def salvar_credenciais(email: str, password: Optional[str]) -> None:
+    """Grava EMAIL no .env e, se `password` for informado, também PASS —
+    preservando as demais variáveis já presentes. `password=None` mantém a
+    senha já salva (usado quando o usuário só quer trocar o e-mail)."""
+    ENV_FILE.touch(exist_ok=True)
+    set_key(str(ENV_FILE), "EMAIL", email)
+    if password:
+        set_key(str(ENV_FILE), "PASS", password)
 
 
 def _is_session_expired_error(page: Page) -> bool:

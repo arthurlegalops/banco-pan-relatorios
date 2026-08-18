@@ -1,13 +1,18 @@
 """Fluxo de polling e download dos relatórios exportados no elaw."""
 
 import logging
+import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
 from playwright.sync_api import Page
 
+import modules.storage as storage
+from modules.cancel import checar_cancelamento
 from modules.elaw import REPORT_FILE_PREFIXES
+from modules.paths import TEMP_DOWNLOADS_DIR
 from modules.progress import OnReport, emit_report
 
 logger = logging.getLogger(__name__)
@@ -25,7 +30,75 @@ def _clip_selector(relatorio_id: str) -> str:
     return f"{row_selector}//img[contains(@title, 'pronto para download') or contains(@src, 'clip')]"
 
 
-def _baixar_relatorio(page: Page, nome_relatorio: str, clip_selector: str, download_dir: Path) -> Path:
+def detectar_relatorios_em_processamento(page: Page, nomes: list[str]) -> dict[str, str]:
+    """Verifica na página de relatórios do elaw se algum dos `nomes` já foi
+    registrado hoje (ex.: execução anterior interrompida antes do download)
+    e retorna {nome: id} para reaproveitar — evita reexportar o relatório e
+    substitui a necessidade de informar o ID manualmente.
+
+    Quando há mais de um registro do mesmo modelo hoje, considera sempre o
+    mais antigo (o primeiro a ter sido solicitado), não o mais recente —
+    é esse que corresponde a uma execução anterior interrompida."""
+    logger.info("Verificando relatórios já registrados hoje na lista do elaw...")
+    try:
+        page.goto(REPORT_LIST_URL, wait_until="domcontentloaded")
+        page.locator('//*[@id="btnPesquisar"]').click()
+        page.wait_for_selector("#tableProcessoReportTmp_data", timeout=10000)
+    except Exception as exc:
+        logger.warning(f"Não foi possível verificar relatórios já registrados: {exc}")
+        return {}
+
+    hoje = time.strftime("%d/%m/%Y")
+    linhas = page.locator("//tbody[@id='tableProcessoReportTmp_data']/tr")
+
+    candidatos: dict[str, tuple[datetime, str]] = {}
+    for i in range(linhas.count()):
+        linha = linhas.nth(i)
+        # `all_text_contents()` lê as células como estão agora, sem esperar
+        # nenhuma ficar "estável" - diferente de `.text_content()` num
+        # `td[N]` específico, que fica retentando até dar timeout se aquela
+        # posição não existir. Isso importa porque, quando a pesquisa não
+        # retorna nenhum relatório, o eLaw renderiza uma única linha "Nenhum
+        # registro encontrado" com uma célula só (colspan) em vez das 12
+        # colunas normais - sem essa checagem de tamanho, cair nessa linha
+        # travava 30s esperando por uma 9ª coluna que nunca ia aparecer.
+        celulas = linha.locator("td").all_text_contents()
+        if len(celulas) < 10:
+            continue
+
+        modelo = celulas[8].strip()
+        if modelo not in nomes:
+            continue
+
+        data_registrado_texto = celulas[9].strip()
+        if not data_registrado_texto.startswith(hoje):
+            continue
+        try:
+            data_registrado = datetime.strptime(data_registrado_texto, "%d/%m/%Y %H:%M")
+        except ValueError:
+            continue
+
+        relatorio_id = celulas[2].strip()
+        if not relatorio_id:
+            continue
+
+        mais_antigo = candidatos.get(modelo)
+        if mais_antigo is None or data_registrado < mais_antigo[0]:
+            candidatos[modelo] = (data_registrado, relatorio_id)
+
+    encontrados = {modelo: relatorio_id for modelo, (_, relatorio_id) in candidatos.items()}
+    for modelo, relatorio_id in encontrados.items():
+        logger.info(
+            f"Relatório '{modelo}' já registrado hoje (ID {relatorio_id}), reaproveitando em vez de reexportar.")
+
+    return encontrados
+
+
+def _baixar_relatorio(page: Page, nome_relatorio: str, clip_selector: str, pasta: str) -> str:
+    """Baixa o relatório do elaw, envia para o S3 (pasta do dia) e retorna
+    a chave S3. O Playwright só sabe salvar em disco local — o arquivo
+    passa por um temporário (`TEMP_DOWNLOADS_DIR`) que é apagado assim que
+    o upload termina; o S3 é a fonte da verdade, não essa pasta."""
     logger.info(f"Baixando relatório '{nome_relatorio}'...")
     with page.expect_download() as download_info:
         page.locator(clip_selector).click()
@@ -36,31 +109,38 @@ def _baixar_relatorio(page: Page, nome_relatorio: str, clip_selector: str, downl
     prefixo = REPORT_FILE_PREFIXES.get(nome_relatorio, nome_relatorio.replace(" ", "_"))
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     filename = f"{prefixo}_{timestamp}{extensao}"
-    download_path = download_dir / filename
-    download.save_as(str(download_path))
-    logger.info(f"Relatório '{nome_relatorio}' salvo em: {download_path}")
-    return download_path
+
+    TEMP_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    caminho_temp = TEMP_DOWNLOADS_DIR / filename
+    download.save_as(str(caminho_temp))
+
+    chave_s3 = storage.enviar_relatorio(caminho_temp, pasta)
+    caminho_temp.unlink(missing_ok=True)
+    logger.info(f"Relatório '{nome_relatorio}' salvo em s3://{storage.S3_BUCKET}/{chave_s3}")
+    return chave_s3
 
 
 def aguardar_e_baixar_relatorios(
     page: Page,
     relatorio_ids: dict[str, str],
     recover: Callable[[], Page],
-    download_dir: Path,
+    pasta: str,
     on_report: OnReport = None,
-) -> tuple[dict[str, Path], Page]:
+    cancel_event: threading.Event | None = None,
+) -> tuple[dict[str, str], Page]:
     """Faz polling e baixa cada relatório assim que ele ficar pronto, sem
-    esperar os demais. Retorna um dict {nome_relatorio: caminho_baixado} e a
+    esperar os demais. Retorna um dict {nome_relatorio: chave_s3} e a
     página (possivelmente recriada) em uso."""
     logger.info("Navegando para a lista de relatórios...")
     page.goto(REPORT_LIST_URL, wait_until="domcontentloaded")
 
     pendentes = dict(relatorio_ids)
-    baixados: dict[str, Path] = {}
+    baixados: dict[str, str] = {}
     page_ref = [page]
 
     start_time = time.monotonic()
     while pendentes and time.monotonic() - start_time < POLL_TIMEOUT:
+        checar_cancelamento(cancel_event)
         for tentativa in range(1, POLL_MAX_ATTEMPTS + 1):
             try:
                 page_ref[0].locator('//*[@id="btnPesquisar"]').click()
@@ -83,8 +163,9 @@ def aguardar_e_baixar_relatorios(
             if page_ref[0].locator(clip).count() > 0:
                 logger.info(f"Relatório '{nome}' (ID {relatorio_id}) pronto para download.")
                 emit_report(on_report, nome, "ready")
-                baixados[nome] = _baixar_relatorio(page_ref[0], nome, clip, download_dir)
-                emit_report(on_report, nome, "downloaded")
+                chave_s3 = _baixar_relatorio(page_ref[0], nome, clip, pasta)
+                baixados[nome] = chave_s3
+                emit_report(on_report, nome, "downloaded", chave_s3)
                 del pendentes[nome]
             else:
                 logger.info(f"Relatório '{nome}' (ID {relatorio_id}) ainda em processamento.")

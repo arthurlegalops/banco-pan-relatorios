@@ -1,5 +1,4 @@
 python-dotenv
 playwright
-fastapi
-uvicorn[standard]
-apscheduler
+boto3
+pymongo

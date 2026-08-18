@@ -2,12 +2,13 @@
 relatórios "DADOS DO PROCESSO", "ESCRITÓRIO - TAREFAS" e "PAUTA GERAL"."""
 
 import logging
-from pathlib import Path
-from typing import Callable
+import threading
+from typing import Callable, Optional
 
 from playwright.sync_api import Page
 
-from modules.download import aguardar_e_baixar_relatorios
+from modules.cancel import checar_cancelamento
+from modules.download import aguardar_e_baixar_relatorios, detectar_relatorios_em_processamento
 from modules.elaw import (
     PAUTA_GERAL_NOME,
     REPORT_NAMES,
@@ -25,40 +26,48 @@ logger = logging.getLogger(__name__)
 def pesquisar(
     page: Page,
     recover: Callable[[], Page],
-    download_dir: Path,
-    existentes: dict[str, Path],
-    ids_informados: dict[str, str] | None = None,
+    pasta: str,
+    existentes: dict[str, str],
     on_step: OnStep = None,
     on_report: OnReport = None,
-) -> list[Path]:
+    cancel_event: Optional[threading.Event] = None,
+) -> dict[str, str]:
     """Aplica os filtros de status, pesquisa, exporta os relatórios
     "DADOS DO PROCESSO", "ESCRITÓRIO - TAREFAS" e "PAUTA GERAL", aguarda
-    todos ficarem prontos e baixa todos em `download_dir`.
+    todos ficarem prontos e envia todos pro S3, na pasta `pasta` (AAAA-MM-DD).
 
     `existentes` traz os relatórios do dia já gerados anteriormente
-    (nome -> caminho), verificados antes de abrir o navegador; apenas os
-    relatórios ausentes desse dict são exportados/baixados aqui.
+    (nome -> chave S3), verificados antes de abrir o navegador; apenas os
+    relatórios ausentes desse dict são exportados/enviados aqui.
 
-    `ids_informados` traz relatórios que já estão em processamento no elaw
-    de uma execução anterior interrompida (nome -> ID); esses não são
-    reexportados, apenas aguardados/baixados diretamente.
+    Antes de exportar, a página de relatórios do elaw é verificada em busca
+    de relatórios já registrados hoje (ex.: execução anterior interrompida
+    antes do download); esses são reaproveitados em vez de reexportados.
 
     `recover` fecha o navegador atual, abre um novo, refaz o login e
     retorna a nova página — usado caso a sessão caia durante a espera
     do processamento dos relatórios.
 
     `on_step` e `on_report`, se informados, são chamados para reportar o
-    progresso do pipeline e o status de cada relatório à interface."""
+    progresso do pipeline e o status de cada relatório à interface.
+
+    `cancel_event`, se informado, é checado entre as etapas — quando
+    marcado, a execução é interrompida com `ExecucaoCancelada`."""
+    checar_cancelamento(cancel_event)
     todos_nomes = REPORT_NAMES + [PAUTA_GERAL_NOME]
-    ids_informados = ids_informados or {}
+    nomes_pendentes = [nome for nome in todos_nomes if nome not in existentes]
 
-    pendentes_geral = [nome for nome in REPORT_NAMES if nome not in existentes and nome not in ids_informados]
-    pauta_pendente = PAUTA_GERAL_NOME not in existentes and PAUTA_GERAL_NOME not in ids_informados
+    relatorio_ids: dict[str, str] = {}
+    if nomes_pendentes:
+        emit_step(on_step, "verificacao", "running")
+        relatorio_ids = detectar_relatorios_em_processamento(page, nomes_pendentes)
+        emit_step(on_step, "verificacao", "done")
+        for nome in relatorio_ids:
+            emit_report(on_report, nome, "waiting")
 
-    relatorio_ids: dict[str, str] = dict(ids_informados)
-    for nome in ids_informados:
-        logger.info(f"Relatório '{nome}' informado como já em processamento (ID {ids_informados[nome]}), pulando exportação.")
-        emit_report(on_report, nome, "waiting")
+    checar_cancelamento(cancel_event)
+    pendentes_geral = [nome for nome in REPORT_NAMES if nome not in existentes and nome not in relatorio_ids]
+    pauta_pendente = PAUTA_GERAL_NOME not in existentes and PAUTA_GERAL_NOME not in relatorio_ids
 
     if pendentes_geral:
         logger.info("Navegando para a página de pesquisa...")
@@ -71,21 +80,30 @@ def pesquisar(
         emit_step(on_step, "pesquisa", "running")
         executar_pesquisa(page)
         emit_step(on_step, "pesquisa", "done")
+    else:
+        logger.info(
+            "Nenhum relatório precisa de nova pesquisa (todos já existentes ou em processamento) — "
+            "pulando seleção de filtros e execução da pesquisa.")
+        emit_step(on_step, "filtros", "skipped")
+        emit_step(on_step, "pesquisa", "skipped")
 
     emit_step(on_step, "exportacao", "running")
     for nome in pendentes_geral:
+        checar_cancelamento(cancel_event)
         emit_report(on_report, nome, "waiting")
         relatorio_ids[nome] = exportar_para_excel(page, nome)
     if pauta_pendente:
+        checar_cancelamento(cancel_event)
         emit_report(on_report, PAUTA_GERAL_NOME, "waiting")
         relatorio_ids[PAUTA_GERAL_NOME] = exportar_pauta_geral(page)
     emit_step(on_step, "exportacao", "done")
 
+    checar_cancelamento(cancel_event)
     emit_step(on_step, "aguardar", "running")
     emit_step(on_step, "download", "running")
-    baixados, page = aguardar_e_baixar_relatorios(page, relatorio_ids, recover, download_dir, on_report)
+    baixados, page = aguardar_e_baixar_relatorios(
+        page, relatorio_ids, recover, pasta, on_report, cancel_event=cancel_event)
     emit_step(on_step, "aguardar", "done")
     emit_step(on_step, "download", "done")
 
-    resultado = {**existentes, **baixados}
-    return [resultado[nome] for nome in todos_nomes]
+    return {**existentes, **baixados}
