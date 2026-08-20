@@ -1,5 +1,5 @@
 <#
-    Gera o instalador final (installer\relatorios_pan_v<versão>.exe) a
+    Gera o instalador final (installer\banco-pan-robo-relatorios.exe) a
     partir do código-fonte. Idempotente: pode ser rodado de novo a qualquer
     momento (ex: depois de alterar código ou o .env) que ele sempre
     regenera tudo do zero a partir do estado atual do projeto.
@@ -109,6 +109,6 @@ if (-not $iscc) {
 Write-Host "Gerando instalador com Inno Setup ($iscc), versão $Version..."
 & $iscc "/DMyAppVersion=$Version" "packaging\relatorios.iss"
 
-$installerName = "relatorios_pan_v$Version.exe"
+$installerName = "banco-pan-robo-relatorios.exe"
 Write-Host ""
 Write-Host "Pronto! Instalador gerado em installer\$installerName (versão $Version)" -ForegroundColor Green

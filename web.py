@@ -415,7 +415,13 @@ def main() -> None:
 
     threading.Thread(target=open_browser, daemon=True).start()
     logger.info(f"Servindo Relatórios · Pan em {url}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    # log_config=None: no build windowed do PyInstaller (console=False)
+    # sys.stdout/stderr chegam como None, e o setup de logging padrão do
+    # uvicorn quebra ao chamar `.isatty()` neles (AttributeError dentro de
+    # dictConfig, virando "ValueError: Unable to configure formatter
+    # 'default'"). Sem log_config o uvicorn não mexe no logging - ele
+    # continua saindo pelo `logging.basicConfig` já configurado acima.
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", log_config=None)
 
 
 if __name__ == "__main__":

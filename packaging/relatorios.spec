@@ -62,7 +62,11 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="RelatoriosPan",
-    console=False,
+    # Terminal visível: fechar só o navegador não encerra o servidor (ele
+    # continua rodando em segundo plano, sem essa janela não há como
+    # percebê-lo nem encerrá-lo) - com console=True o usuário tem uma
+    # janela pra fechar (ou Ctrl+C) quando quiser parar o app de verdade.
+    console=True,
 )
 
 coll = COLLECT(
