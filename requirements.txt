@@ -2,3 +2,5 @@ python-dotenv
 playwright
 boto3
 pymongo
+fastapi
+uvicorn[standard]

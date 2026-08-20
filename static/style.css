@@ -1,0 +1,230 @@
+* { box-sizing: border-box; }
+
+/* CSS de autor sempre vence o `display:none` que o atributo [hidden] herda
+   do stylesheet do navegador, não importa a ordem/especificidade — sem essa
+   regra, qualquer seletor abaixo que fixe `display` (.modal-overlay,
+   .msg-box, ...) faz o elemento continuar visível mesmo com `hidden`
+   presente no HTML. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #f0f0f0;
+  font-family: "Segoe UI", Tahoma, system-ui, sans-serif;
+  color: #111;
+}
+
+a { color: #0b5cad; text-decoration: none; }
+a:hover { color: #084a8c; text-decoration: underline; }
+
+::-webkit-scrollbar { width: 14px; height: 14px; }
+::-webkit-scrollbar-track { background: #f0f0f0; }
+::-webkit-scrollbar-thumb { background: #cdcdcd; border: 3px solid #f0f0f0; }
+::-webkit-scrollbar-thumb:hover { background: #a6a6a6; }
+
+.page {
+  height: 100vh;
+  background: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  background: #fff;
+  padding: 22px 26px 0 26px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.title { font-size: 28px; font-weight: 700; color: #111; }
+.subtitle { font-size: 12px; color: #666; margin-top: 2px; max-width: 620px; }
+
+.actions { margin-left: auto; display: flex; gap: 8px; }
+
+.btn {
+  font: 12px "Segoe UI", sans-serif;
+  padding: 5px 14px;
+  background: #e1e1e1;
+  border: 1px solid #adadad;
+  cursor: pointer;
+  color: #111;
+}
+.btn:hover:not(:disabled) { background: #e5f1fb; border: 1px solid #0078d7; }
+.btn:active:not(:disabled) { background: #cce4f7; }
+.btn:disabled { color: #999; cursor: default; }
+
+.btn-primary { padding: 5px 16px; background: #e5f1fb; border: 1px solid #0078d7; }
+.btn-primary:hover:not(:disabled) { background: #cce4f7; }
+.btn-primary:active:not(:disabled) { background: #b3d7f2; }
+
+.btn-small { font-size: 11.5px; padding: 4px 10px; }
+
+.warning {
+  margin: 12px 26px 0 26px;
+  padding: 8px 14px;
+  background: #fdecea;
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  font-size: 12px;
+}
+
+.columns {
+  flex: 1;
+  background: #fff;
+  padding: 22px 26px 22px 26px;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 26px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.col { display: flex; flex-direction: column; min-height: 0; }
+
+.col-header { display: flex; align-items: center; margin-bottom: 8px; }
+.col-title { font-size: 14px; font-weight: 700; color: #111; }
+.col-header .btn { margin-left: auto; }
+
+.list-box {
+  border: 1px solid #a0a0a0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+  background: #fff;
+}
+
+.list-head, .list-row {
+  display: grid;
+  grid-template-columns: 110px 130px 110px 1fr 100px;
+  font-size: 12px;
+}
+
+.list-head {
+  position: sticky;
+  top: 0;
+  background: #f0f0f0;
+  border-bottom: 1px solid #c9c9c9;
+  font-weight: 600;
+  color: #333;
+  z-index: 1;
+}
+.list-head > div { padding: 5px 8px; border-right: 1px solid #d9d9d9; }
+.list-head > div:last-child { border-right: none; }
+
+.list-row {
+  cursor: default;
+  user-select: none;
+  background: #fff;
+  color: #111;
+}
+.list-row:hover { outline: 1px dotted #0078d7; outline-offset: -1px; }
+.list-row > div { padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.list-row.status-running { background: #e9effa; }
+.list-row.status-success { background: #e8f6ec; }
+.list-row.status-error { background: #fbebe9; }
+.list-row.status-cancelled { background: #fbf3de; }
+.list-row.selected { background: #0078d7 !important; color: #fff; }
+
+.list-empty { padding: 16px; font-size: 12px; color: #666; }
+
+.empty-label { color: #6b6b6b; font-size: 13px; padding-top: 40px; text-align: center; }
+
+.detail-content { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+
+.detail-title-row { display: flex; align-items: baseline; gap: 10px; }
+.detail-title { font-size: 22px; font-weight: 700; color: #111; }
+.detail-status { font-size: 12px; font-weight: 600; }
+
+.report-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.report-buttons a.btn { display: inline-flex; align-items: center; }
+
+.detail-meta { font-size: 12px; color: #444; margin-top: 8px; }
+
+.msg-box {
+  font-size: 12px;
+  margin-top: 10px;
+  border: 1px solid #c0392b;
+  background: #fdecea;
+  color: #c0392b;
+  padding: 8px 14px;
+  display: inline-block;
+  white-space: pre-wrap;
+}
+
+.logs-header { display: flex; align-items: center; margin-top: 16px; }
+.logs-title { font-size: 13px; font-weight: 600; color: #333; }
+.logs-actions { margin-left: auto; display: flex; gap: 6px; }
+
+.log-box {
+  border: 1px solid #a0a0a0;
+  background: #fff;
+  margin-top: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+  padding: 8px 10px;
+  font: 12px/1.6 Consolas, ui-monospace, monospace;
+}
+
+.log-line { display: flex; gap: 14px; white-space: pre-wrap; }
+.log-time { color: #555; }
+.log-level { width: 66px; flex: none; }
+.log-msg { color: #111; }
+
+.log-level-INFO { color: #0b5cad; }
+.log-level-WARNING, .log-level-WARN { color: #9a6b00; }
+.log-level-ERROR { color: #c0392b; }
+
+.status-bar {
+  flex: none;
+  min-height: 22px;
+  padding: 4px 26px;
+  font-size: 12px;
+  background: #f0f0f0;
+}
+
+/* modais */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal {
+  background: #f0f0f0;
+  border: 1px solid #888;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+  width: 380px;
+  padding: 18px 20px;
+}
+.modal-credenciais { width: 380px; }
+
+.modal-title { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 8px; }
+.modal-msg { font-size: 12px; color: #444; margin-bottom: 14px; }
+
+.modal label { display: block; font-size: 12px; color: #333; margin: 10px 0 3px 0; }
+.modal input[type="text"], .modal input[type="password"], .modal textarea {
+  width: 100%;
+  font: 12px "Segoe UI", sans-serif;
+  padding: 5px 6px;
+  border: 1px solid #a0a0a0;
+}
+.modal textarea { resize: vertical; }
+
+.field-hint { font-size: 10.5px; color: #6b6b6b; margin-top: 3px; }
+
+.modal-error { color: #c0392b; font-size: 12px; margin-top: 8px; min-height: 14px; }
+
+.modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

@@ -4,7 +4,7 @@ outras, ao contrário do antigo runs.db em SQLite, que era local por máquina).
 
 Mantém a mesma interface pública que a versão SQLite (list_runs,
 create_run_record, finish_run_record, get_run) para não exigir mudanças
-no restante do app (gui.py)."""
+no restante do app (web.py)."""
 
 import getpass
 from datetime import datetime

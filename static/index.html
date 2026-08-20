@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios · Pan</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="titlebox">
+      <div class="title">Relatórios</div>
+      <div class="subtitle">Extração automatizada de relatórios DADOS DO PROCESSO, ESCRITÓRIO - TAREFAS e PAUTA GERAL</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnCredenciais">Credenciais</button>
+      <button class="btn btn-primary" id="btnExecutar">▶ Executar agora</button>
+    </div>
+  </div>
+
+  <div class="warning" id="warning" hidden></div>
+
+  <div class="columns">
+    <div class="col">
+      <div class="col-header">
+        <span class="col-title">Execuções</span>
+        <button class="btn btn-small" id="btnAtualizar">⟳ Atualizar</button>
+      </div>
+      <div class="list-box">
+        <div class="list-head">
+          <div>Execução</div>
+          <div>Início</div>
+          <div>Usuário</div>
+          <div>Relatórios</div>
+          <div>Status</div>
+        </div>
+        <div class="list-body" id="listBody"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="empty-label" id="emptyLabel">Nenhuma execução selecionada. Clique em "Executar agora" para começar.</div>
+      <div class="detail-content" id="detailContent" hidden>
+        <div class="detail-title-row">
+          <span class="detail-title" id="detTitle">Nenhuma execução selecionada</span>
+          <span class="detail-status" id="detStatus"></span>
+        </div>
+        <div class="report-buttons" id="reportButtons" hidden></div>
+        <div class="detail-meta" id="detMeta"></div>
+        <div class="msg-box" id="msgBox" hidden></div>
+
+        <div class="logs-header">
+          <span class="logs-title">Logs</span>
+          <div class="logs-actions">
+            <button class="btn btn-small" id="btnCopiar">Copiar</button>
+            <a class="btn btn-small" id="btnAbrir" href="#" download>Abrir arquivo</a>
+          </div>
+        </div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal" id="modalYesNo">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-msg" id="modalMsg"></div>
+    <div class="modal-buttons">
+      <button class="btn" id="modalNo">Não</button>
+      <button class="btn btn-primary" id="modalYes">Sim</button>
+    </div>
+  </div>
+
+  <div class="modal modal-credenciais" id="modalCredenciais" hidden>
+    <div class="modal-title">Credenciais do eLaw</div>
+    <div class="modal-msg">Usadas pelo robô para fazer login automaticamente no eLaw. Ficam salvas só nesta máquina.</div>
+    <label>E-mail</label>
+    <input type="text" id="credEmail">
+    <label>Senha</label>
+    <input type="password" id="credSenha">
+    <div class="field-hint" id="credSenhaHint"></div>
+    <div class="modal-error" id="credError"></div>
+    <div class="modal-buttons">
+      <button class="btn" id="credCancelar">Cancelar</button>
+      <button class="btn btn-primary" id="credSalvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

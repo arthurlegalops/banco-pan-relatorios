@@ -93,3 +93,10 @@ def baixar_para_local(chave: str, destino: Path) -> Path:
     destino.parent.mkdir(parents=True, exist_ok=True)
     _s3().download_file(S3_BUCKET, chave, str(destino))
     return destino
+
+
+def obter_bytes(chave: str) -> bytes:
+    """Lê um objeto do S3 direto para memória — usado pela rota de download
+    do painel web, que serve o arquivo como resposta HTTP sem precisar
+    passar por um arquivo temporário local."""
+    return _s3().get_object(Bucket=S3_BUCKET, Key=chave)["Body"].read()
