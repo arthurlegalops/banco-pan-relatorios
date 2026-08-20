@@ -80,12 +80,10 @@
       const row = document.createElement("div");
       row.className = "list-row status-" + status;
       if (r.id === selectedId) row.classList.add("selected");
-      const relatorios = r.relatorios.length ? r.relatorios.join(", ") : "—";
       row.innerHTML = `
         <div>Execução #${r.id}</div>
         <div>${r.inicio || "-"}</div>
         <div>${r.usuario || "-"}</div>
-        <div title="${escapeHtml(relatorios)}">${escapeHtml(relatorios)}</div>
         <div>${STATUS_LABEL[status] || status}</div>`;
       row.addEventListener("click", () => selectExecucao(r.id));
       listBody.appendChild(row);

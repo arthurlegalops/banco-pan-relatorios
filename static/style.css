@@ -102,7 +102,7 @@ a:hover { color: #084a8c; text-decoration: underline; }
 
 .list-head, .list-row {
   display: grid;
-  grid-template-columns: 110px 130px 110px 1fr 100px;
+  grid-template-columns: 130px 150px 1fr 110px;
   font-size: 12px;
 }
 

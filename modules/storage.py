@@ -100,3 +100,24 @@ def obter_bytes(chave: str) -> bytes:
     do painel web, que serve o arquivo como resposta HTTP sem precisar
     passar por um arquivo temporário local."""
     return _s3().get_object(Bucket=S3_BUCKET, Key=chave)["Body"].read()
+
+
+def obter_texto(chave: str) -> str:
+    """Igual a `obter_bytes`, decodificado como texto — usado para o log de
+    uma execução, servido pela GUI direto do S3 (nunca do disco local)."""
+    return obter_bytes(chave).decode("utf-8")
+
+
+def chave_log(pasta: str, run_id: int) -> str:
+    return f"{S3_PREFIX_BASE}/logs/{pasta}/{run_id}.log"
+
+
+def enviar_log(caminho_local: Path, pasta: str, run_id: int) -> str:
+    """Envia o log de uma execução para o S3 (subpasta `logs/`, separada
+    dos relatórios) e retorna a chave — gravada em `runs.log_uri` no
+    MongoDB, para a GUI buscar o log ali em vez de depender do disco local
+    da máquina que rodou a execução."""
+    chave = chave_log(pasta, run_id)
+    _s3().upload_file(str(caminho_local), S3_BUCKET, chave)
+    logger.info(f"Log da execução #{run_id} enviado para s3://{S3_BUCKET}/{chave}")
+    return chave

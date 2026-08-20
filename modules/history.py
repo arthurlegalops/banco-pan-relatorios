@@ -62,6 +62,7 @@ def create_run_record() -> int:
         "downloads": {},
         "error": None,
         "usuario": getpass.getuser(),
+        "log_uri": None,
     })
     return run_id
 
@@ -98,6 +99,17 @@ def finish_run_record(
             "downloads": downloads,
             "error": error,
         }},
+    )
+
+
+def registrar_log(run_id: int, chave_s3: str) -> None:
+    """Grava a chave S3 (URI) do log de uma execução, assim que ele é
+    enviado ao fim dela — a GUI busca o log ali (`obter_texto`), nunca do
+    disco local da máquina que rodou."""
+    db = _database()
+    db.runs.update_one(
+        {"_id": run_id},
+        {"$set": {"log_uri": chave_s3}},
     )
 
 

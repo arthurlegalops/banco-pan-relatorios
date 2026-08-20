@@ -169,6 +169,21 @@ def _worker(run_id: int, cancel_event: threading.Event) -> None:
     finally:
         root_logger.removeHandler(handler)
         handler.close()
+
+        # O log é enviado pro S3 (e a URI, gravada no Mongo) assim que a
+        # execução termina — a GUI sempre busca o log de lá, nunca do disco
+        # local, pra ficar visível de qualquer máquina, não só de quem
+        # rodou. O arquivo local (escrito por _RunLogHandler durante a
+        # execução) só existe de passagem: some depois do upload; se o
+        # upload falhar, fica pra trás como último recurso de diagnóstico.
+        try:
+            pasta = storage.pasta_do_dia()
+            log_uri = storage.enviar_log(log_path, pasta, run_id)
+            history.registrar_log(run_id, log_uri)
+            log_path.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning(f"Não foi possível enviar o log da execução #{run_id} para o S3: {exc}")
+
         history.finish_run_record(run_id, error, downloads, cancelado=cancelado)
         with state.lock:
             state.worker_thread = None
@@ -260,13 +275,25 @@ def api_execucoes() -> dict:
     }
 
 
+def _texto_log_do_s3(run_id: int) -> Optional[str]:
+    run = history.get_run(run_id)
+    log_uri = run.get("log_uri") if run else None
+    if not log_uri:
+        return None
+    try:
+        return storage.obter_texto(log_uri)
+    except Exception as exc:
+        logger.warning(f"Falha ao buscar no S3 o log da execução #{run_id}: {exc}")
+        return None
+
+
 @app.get("/api/logs/{run_id}")
 def api_logs(run_id: int) -> dict:
-    log_path = LOGS_DIR / f"{run_id}.log"
-    if not log_path.exists():
+    texto = _texto_log_do_s3(run_id)
+    if texto is None:
         return {"linhas": [], "encontrado": False}
     linhas = []
-    for line in log_path.read_text(encoding="utf-8").splitlines():
+    for line in texto.splitlines():
         parsed = _parse_log_line(line)
         if parsed:
             t, lvl, msg = parsed
@@ -278,10 +305,14 @@ def api_logs(run_id: int) -> dict:
 
 @app.get("/api/logs/{run_id}/download")
 def api_logs_download(run_id: int):
-    log_path = LOGS_DIR / f"{run_id}.log"
-    if not log_path.exists():
-        raise HTTPException(404, "O arquivo de log dessa execução ainda não existe.")
-    return FileResponse(log_path, filename=f"{run_id}.log", media_type="text/plain")
+    texto = _texto_log_do_s3(run_id)
+    if texto is None:
+        raise HTTPException(404, "Log não encontrado para essa execução.")
+    return Response(
+        content=texto,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{run_id}.log"'},
+    )
 
 
 @app.get("/api/relatorios/{run_id}/{nome}")
