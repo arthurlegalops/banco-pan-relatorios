@@ -6,6 +6,7 @@ Mantém a mesma interface pública que a versão SQLite (list_runs,
 create_run_record, finish_run_record, get_run) para não exigir mudanças
 no restante do app (gui.py)."""
 
+import getpass
 from datetime import datetime
 from typing import Optional
 
@@ -60,6 +61,7 @@ def create_run_record() -> int:
         "status": "running",
         "downloads": {},
         "error": None,
+        "usuario": getpass.getuser(),
     })
     return run_id
 

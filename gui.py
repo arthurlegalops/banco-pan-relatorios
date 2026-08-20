@@ -257,14 +257,16 @@ class App:
         ttk.Label(toolbar, text="Execuções", font=(self.font_family, 10, "bold")).pack(side="left")
         ttk.Button(toolbar, text="↻ Atualizar", command=self._refresh_index).pack(side="right")
 
-        columns = ("id", "inicio", "relatorios", "status")
+        columns = ("id", "inicio", "usuario", "relatorios", "status")
         self.tree = ttk.Treeview(frame, columns=columns, show="headings", selectmode="browse")
         self.tree.heading("id", text="Execução")
         self.tree.heading("inicio", text="Início")
+        self.tree.heading("usuario", text="Usuário")
         self.tree.heading("relatorios", text="Relatórios")
         self.tree.heading("status", text="Status")
         self.tree.column("id", width=110, anchor="w")
         self.tree.column("inicio", width=130, anchor="w")
+        self.tree.column("usuario", width=100, anchor="w")
         self.tree.column("relatorios", width=220, anchor="w")
         self.tree.column("status", width=110, anchor="w")
         for categoria, bg in CORES_LINHA.items():
@@ -366,7 +368,8 @@ class App:
             label = RUN_STATUS_LABEL.get(status, status)
             categoria = RUN_STATUS_CATEGORIA.get(status, "cinza")
             self.tree.insert("", "end", iid=str(r["id"]), values=(
-                f"Execução #{r['id']}", fmt_data(r["started_at"]), relatorios, label), tags=(categoria,))
+                f"Execução #{r['id']}", fmt_data(r["started_at"]), r.get("usuario") or "—",
+                relatorios, label), tags=(categoria,))
         if self.selected_run_id is not None and self.tree.exists(str(self.selected_run_id)):
             self.tree.selection_set(str(self.selected_run_id))
 
@@ -420,6 +423,8 @@ class App:
         self.detail_badge.configure(text=f"● {label}", foreground=CORES[categoria])
 
         meta = f"Iniciada em {fmt_data(run['started_at'])}"
+        if run.get("usuario"):
+            meta += f" · Usuário: {run['usuario']}"
         if run.get("finished_at"):
             meta += f" · Concluída em {fmt_data(run['finished_at'])}"
         self.detail_meta_var.set(meta)
